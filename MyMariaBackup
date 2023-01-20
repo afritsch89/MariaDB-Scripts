@@ -86,4 +86,7 @@ for db in $databases; do
     echo "$db incremental backup: $(date +"%Y-%m-%d %H:%M:%S")" >> "$backup_dir/backup.log"
     # delete old backups older than the retention period
     find $backup_dir -maxdepth 1 -name "$db-*-inc.xbstream" -mtime +$retention_days -exec rm -f {} \;
+    
+    chown $mDBA:$mGroup $backup_dir
+
 done
