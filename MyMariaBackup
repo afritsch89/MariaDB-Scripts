@@ -1,0 +1,89 @@
+#!/bin/bash
+source backup.conf
+
+# Set the date
+date=$(date +"%Y-%m-%d-%H-%M-%S")
+
+# Get the current day of the week (Sunday=0, Monday=1, Tuesday=2, etc.)
+day_of_week=$(date +"%u")
+
+# check command line arguments
+while [[ $# -gt 0 ]]
+do
+key="$1"
+
+case $key in
+    -b|--backup-dir)
+    backup_dir="$2"
+    shift # past argument
+    ;;
+    -c|--compressed-backup-dir)
+    compressed_backup_dir="$2"
+    shift # past argument
+    ;;
+    -u|--user)
+    user="$2"
+    shift # past argument
+    ;;
+    -p|--password)
+    password="$2"
+    shift # past argument
+    ;;
+    -d|--databases)
+    databases="$2"
+    shift # past argument
+    ;;
+    -r|--retention-days)
+    retention_days="$2"
+    shift # past argument
+    ;;
+    -h|--help)
+    echo "Usage: backup.sh [-b|--backup-dir directory] [-c|--compressed-backup-dir directory] [-u|--user username] [-p|--password password] [-d|--databases 'db1 db2'] [-r|--retention-days number]"
+    exit 0
+    ;;
+    *)
+            # unknown option
+    ;;
+esac
+shift # past argument or value
+done
+
+
+# Loop through the databases
+for db in $databases; do
+  # Create the backup file
+  filename="$backup_dir/$db-$date.xbstream"
+  if [ $day_of_week -eq 0 ]
+  then
+    # Run the full backup command
+    mariabackup --user=$user --password=$password --backup --target-dir=$filename
+    # Compress the full backup
+    gzip "$filename"
+    # Move the compressed backup to the compressed backup directory
+    cp "$filename.gz" "$compressed_backup_dir/$db-$date-full.xbstream.gz"
+    # Log the backup information
+    echo "$db full backup: $(date +"%Y-%m-%d %H:%M:%S")" >> "$backup_dir/backup.log"
+    # delete old backups older than the retention period
+    find $backup_dir -maxdepth 1 -name "$db-*-full.xbstream" -mtime +$retention_days -exec rm -f {} \;
+  else
+    # Get the lastest uncompressed full backup
+    last_full_backup=$(find $backup_dir -maxdepth 1 -name "$db-*-full.xbstream" | sort -r | head -n 1)
+    # Run the incremental backup command using the lastest full backup as the base
+    mariabackup --user=$user --password=$password --backup --incremental-basedir=$last_full_backup --target-dir=$filename
+  else
+    if [ $day_of_week -ge 2 ] && [ $day_of_week -le 6 ]
+    then
+        # Get the lastest uncompressed incremental backup
+        last_inc_backup=$(find $backup_dir -maxdepth 1 -name "$db-*-inc.xbstream" | sort -r | head -n 1)
+        # Run the incremental backup command using the lastest incremental backup as the base
+        mariabackup --user=$user --password=$password --backup --incremental-basedir=$last_inc_backup --target-dir=$filename
+        fi
+    # Compress the backup
+    gzip "$filename"
+    # Move the compressed backup to the compressed backup directory
+    cp "$filename.gz" "$compressed_backup_dir/$db-$date-inc.xbstream.gz"
+    # Log the backup information
+    echo "$db incremental backup: $(date +"%Y-%m-%d %H:%M:%S")" >> "$backup_dir/backup.log"
+    # delete old backups older than the retention period
+    find $backup_dir -maxdepth 1 -name "$db-*-inc.xbstream" -mtime +$retention_days -exec rm -f {} \;
+done
