@@ -33,12 +33,15 @@ case $key in
     databases="$2"
     shift # past argument
     ;;
+    -f|--force-full)
+    force_full=true
+    ;;
     -r|--retention-days)
     retention_days="$2"
     shift # past argument
     ;;
     -h|--help)
-    echo "Usage: backup.sh [-b|--backup-dir directory] [-c|--compressed-backup-dir directory] [-u|--user username] [-p|--password password] [-d|--databases 'db1 db2'] [-r|--retention-days number]"
+    echo "Usage: backup.sh [-b|--backup-dir directory] [-c|--compressed-backup-dir directory] [-u|--user username] [-p|--password password] [-d|--databases 'db1 db2'] [-r|--retention-days number] [-f|--force-full]"
     exit 0
     ;;
     *)
@@ -53,7 +56,7 @@ done
 for db in $databases; do
   # Create the backup file
   filename="$backup_dir/$db-$date.xbstream"
-  if [ $day_of_week -eq 0 ]
+  if [ $day_of_week -eq 0 ] || [ $force_full ]
   then
     # Run the full backup command
     mariabackup --user=$user --password=$password --backup --target-dir=$filename
@@ -65,19 +68,12 @@ for db in $databases; do
     echo "$db full backup: $(date +"%Y-%m-%d %H:%M:%S")" >> "$backup_dir/backup.log"
     # delete old backups older than the retention period
     find $backup_dir -maxdepth 1 -name "$db-*-full.xbstream" -mtime +$retention_days -exec rm -f {} \;
-  else
-    # Get the lastest uncompressed full backup
-    last_full_backup=$(find $backup_dir -maxdepth 1 -name "$db-*-full.xbstream" | sort -r | head -n 1)
+  elif [ $day_of_week -eq 1 ]
+    then
+        # Get the lastest uncompressed full backup
+        last_full_backup=$(find $backup_dir -maxdepth 1 -name "$db-*-full.xbstream" | sort -r | head -n 1)
     # Run the incremental backup command using the lastest full backup as the base
     mariabackup --user=$user --password=$password --backup --incremental-basedir=$last_full_backup --target-dir=$filename
-  else
-    if [ $day_of_week -ge 2 ] && [ $day_of_week -le 6 ]
-    then
-        # Get the lastest uncompressed incremental backup
-        last_inc_backup=$(find $backup_dir -maxdepth 1 -name "$db-*-inc.xbstream" | sort -r | head -n 1)
-        # Run the incremental backup command using the lastest incremental backup as the base
-        mariabackup --user=$user --password=$password --backup --incremental-basedir=$last_inc_backup --target-dir=$filename
-        fi
     # Compress the backup
     gzip "$filename"
     # Move the compressed backup to the compressed backup directory
@@ -86,7 +82,22 @@ for db in $databases; do
     echo "$db incremental backup: $(date +"%Y-%m-%d %H:%M:%S")" >> "$backup_dir/backup.log"
     # delete old backups older than the retention period
     find $backup_dir -maxdepth 1 -name "$db-*-inc.xbstream" -mtime +$retention_days -exec rm -f {} \;
-    
-    chown $mDBA:$mGroup $backup_dir
-
+  else
+        # Get the lastest uncompressed incremental backup
+        last_inc_backup=$(find $backup_dir -maxdepth 1 -name "$db-*-inc.xbstream" | sort -r | head -n 1)
+        # Run the incremental backup command using the lastest incremental backup as the base
+        mariabackup --user=$user --password=$password --backup --incremental-basedir=$last_inc_backup --target-dir=$filename
+        # Compress the backup
+        gzip "$filename"
+        # Move the compressed backup to the compressed backup directory
+        cp "$filename.gz" "$compressed_backup_dir/$db-$date-inc.xbstream.gz"
+        # Log the backup information
+    # Compress the backup
+    gzip "$filename"
+    # Move the compressed backup to the compressed backup directory
+    cp "$filename.gz" "$compressed_backup_dir/$db-$date-inc.xbstream.gz"
+    # Log the backup information
+    echo "$db incremental backup: $(date +"%Y-%m-%d %H:%M:%S")" >> "$backup_dir/backup.log"
+    # delete old backups older than the retention period
+    find $backup_dir -maxdepth 1 -name "$db-*-inc.xbstream" -mtime +$retention_days -exec rm -f {} \;
 done
