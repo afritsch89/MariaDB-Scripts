@@ -1,4 +1,3 @@
-[fritscha@azgva0cmd1snrbpodb backups]$ clear && cat /glide/scripts/mariaChraBackup
 #!/bin/bash
 source /glide/scripts/backup.conf
 
@@ -117,4 +116,3 @@ End Time: $(date +"%Y-%m-%d %H:%M:%S")
 #chown back to dba and snow
 /usr/bin/chown -R fritscha:snow /glide/backups/
 done
-[fritscha@azgva0cmd1snrbpodb backups]$
