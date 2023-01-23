@@ -82,7 +82,7 @@ End Time: $(date +"%Y-%m-%d %H:%M:%S")
 ######FULL END######
 
 ###INC BACKUP###
-  elif [ $day_of_week -ge 1 ] && [ $day_of_week -le 6  ] || [ $force_inc ]
+	elif [ $day_of_week -ne 0 ] || [ $force_inc ]
 	filename="$backup_dir/$db-$date-inc.backup"
     # Get the lastest uncompressed backup
 		last_backup=$(find $backup_dir -maxdepth 1 -name "*.backup" | sort -r | head -n 1)
