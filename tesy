@@ -1,3 +1,4 @@
-grep "`date +%Y-%m-%d -d '-1 day'`" /path/to/audit.log | awk '{ sum += length } END { print sum }'
-
-ls -lh `grep "`date +\%Y-\%m-\%d -d '-1 day'`" /path/to/audit.log | awk '{ sum += $5 } END { print sum }'`
+SET @start_time = '2022-01-01 00:00:00';
+SET @end_time = '2022-01-31 23:59:59';
+SELECT COUNT(*) FROM mysql.audit_log
+WHERE event_time BETWEEN @start_time AND @end_time;
