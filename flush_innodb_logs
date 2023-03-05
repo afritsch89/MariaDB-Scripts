@@ -1,26 +1,37 @@
 #!/bin/bash
 
-# Connect to the MySQL server and execute the FLUSH ENGINE LOGS command
-mysql -u root -p -e "FLUSH ENGINE LOGS;"
+# Set the path to the redo log files
+log_path="/var/lib/mysql"
+
+# Connect to the MariaDB server and execute the FLUSH ENGINE LOGS command
+mysql -e "FLUSH ENGINE LOGS;"
+
+# Get the size of the redo log files in bytes
+log_size=$(($(stat -c%s "$log_path/ib_logfile0") + $(stat -c%s "$log_path/ib_logfile1")))
 
 # Initialize the progress bar
-echo -ne '#####                     (33%)\r'
+echo -ne '['
 
 # Loop until the log is fully flushed
 while true; do
 
     # Execute the SHOW ENGINE INNODB STATUS command and extract the "Log flushed up to" value
-    log_flushed_up_to=$(mysql -u root -p -e "SHOW ENGINE INNODB STATUS\G" | grep "Log flushed up to" | awk '{print $NF}')
+    log_flushed_up_to=$(mysql -e "SHOW ENGINE INNODB STATUS\G" | grep "Log flushed up to" | awk '{print $NF}')
+
+    # Calculate the percentage of the redo log that has been flushed
+    percent_completed=$(( log_flushed_up_to * 100 / log_size ))
+
+    # Calculate the number of equals signs and dashes to display in the progress bar
+    num_equals=$(( percent_completed / 2 ))
+    num_dashes=$(( 50 - num_equals ))
+
+    # Update the progress bar with the current percentage completed
+    echo -ne "$(printf '#%.0s' $(seq 1 $num_equals))$(printf '-%.0s' $(seq 1 $num_dashes)) $percent_completed%%\r"
 
     # Check if the log has been fully flushed
     if [[ "$log_flushed_up_to" == *"purged"* ]]; then
-        # If the log has been purged, update the progress bar and exit the loop
-        echo -ne '#############             (66%)\r'
+        # If the log has been purged, exit the loop
         break
-    else
-        # If the log has not been purged, update the progress bar with the percentage completed
-        percent_completed=$(( log_flushed_up_to * 100 / $(cat /var/lib/mysql/ib_logfile0 | wc -c) ))
-        echo -ne "$percent_completed% complete\r"
     fi
 
     # Sleep for 1 second before checking the status again
@@ -28,6 +39,5 @@ while true; do
 done
 
 # Display a message indicating that the log has been fully flushed
-echo -ne '#######################   (100%)\r'
 echo -ne '\n'
 echo "Log has been fully flushed."
