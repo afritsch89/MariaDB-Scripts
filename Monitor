@@ -1,0 +1,51 @@
+#!/bin/bash
+
+# Monitoring Script
+
+# Set MariaDB credentials
+DB_USER="your_username"
+DB_PASSWORD="your_password"
+
+# Set the threshold values for alerts
+CPU_THRESHOLD=80   # CPU usage threshold percentage
+MEMORY_THRESHOLD=80   # Memory usage threshold percentage
+QUERY_THRESHOLD=100   # Maximum number of queries allowed
+REPLICATION_THRESHOLD="ON"   # Replication status threshold
+
+# Connect to the database and collect metrics
+cpu_usage=$(mysql -u "$DB_USER" -p"$DB_PASSWORD" -e "SHOW GLOBAL STATUS LIKE 'cpu_used_by_sql';" | awk '{print $2}')
+memory_usage=$(mysql -u "$DB_USER" -p"$DB_PASSWORD" -e "SHOW GLOBAL STATUS LIKE 'innodb_buffer_pool_bytes_data';" | awk '{print $2}')
+query_count=$(mysql -u "$DB_USER" -p"$DB_PASSWORD" -e "SHOW GLOBAL STATUS LIKE 'queries';" | awk '{print $2}')
+replication_status=$(mysql -u "$DB_USER" -p"$DB_PASSWORD" -e "SHOW SLAVE STATUS\G" | grep "Slave_IO_Running" | awk '{print $2}')
+
+# Check metrics against thresholds and generate alerts or reports
+if [[ $cpu_usage -gt $CPU_THRESHOLD ]]; then
+    echo "Alert: High CPU usage! Current usage: $cpu_usage%"
+fi
+
+if [[ $memory_usage -gt $MEMORY_THRESHOLD ]]; then
+    echo "Alert: High memory usage! Current usage: $memory_usage bytes"
+fi
+
+if [[ $query_count -gt $QUERY_THRESHOLD ]]; then
+    echo "Alert: High query throughput! Current query count: $query_count"
+fi
+
+if [[ $replication_status != $REPLICATION_THRESHOLD ]]; then
+    echo "Alert: Replication is not in the expected state! Current status: $replication_status"
+fi
+
+#In this script:
+
+#Set the DB_USER and DB_PASSWORD variables to the appropriate username and password with privileges to access the MariaDB instance.
+#Adjust the CPU_THRESHOLD, MEMORY_THRESHOLD, QUERY_THRESHOLD, and REPLICATION_THRESHOLD values according to your desired thresholds for generating alerts.
+#The script connects to the database using the provided credentials and collects the following metrics:
+#CPU usage: Retrieves the value of the cpu_used_by_sql global status variable.
+#Memory usage: Retrieves the value of the innodb_buffer_pool_bytes_data global status variable.
+#Query count: Retrieves the value of the queries global status variable.
+#Replication status: Retrieves the value of the Slave_IO_Running status variable from the SHOW SLAVE STATUS command.
+#The script then checks the collected metrics against the defined thresholds and generates alerts if any threshold is exceeded.
+
+#You can schedule this script to run at regular intervals using cron or any other task scheduling mechanism that suits your environment. Customize the script according to your specific metrics and alerting requirements.
+
+#Remember to ensure that the script file has the appropriate permissions, and test it thoroughly before deploying it to your production environment.
