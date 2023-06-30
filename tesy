@@ -1,4 +1,0 @@
-SET @start_time = '2022-01-01 00:00:00';
-SET @end_time = '2022-01-31 23:59:59';
-SELECT COUNT(*) FROM mysql.audit_log
-WHERE event_time BETWEEN @start_time AND @end_time;
